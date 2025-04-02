@@ -1,37 +1,41 @@
-import { useState, useEffect } from 'react';
-import { View, Text, TextInput, Button, Alert } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import React, { useState, useEffect } from "react";
+import { View, Alert } from "react-native";
+import { Text, TextInput, Button, useTheme } from "react-native-paper";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 interface Note {
   id: number;
   content: string;
+  category?: string;
 }
 
 export default function EditNoteScreen() {
+  const theme = useTheme();
   const router = useRouter();
   const { noteId } = useLocalSearchParams();
-  const [noteContent, setNoteContent] = useState('');
+  const [noteContent, setNoteContent] = useState("");
+  const [category, setCategory] = useState("");
   const [note, setNote] = useState<Note | null>(null);
 
   useEffect(() => {
     const loadNote = async () => {
       try {
-        const storedNotes = await AsyncStorage.getItem('notes');
+        const storedNotes = await AsyncStorage.getItem("notes");
         if (storedNotes) {
           const notesArray: Note[] = JSON.parse(storedNotes);
-          // Сравниваем noteId как строку, так как query-параметры всегда строки
           const foundNote = notesArray.find((n) => n.id.toString() === noteId);
           if (foundNote) {
             setNote(foundNote);
             setNoteContent(foundNote.content);
+            setCategory(foundNote.category || "");
           } else {
-            Alert.alert('Ошибка', 'Заметка не найдена');
+            Alert.alert("Ошибка", "Заметка не найдена");
             router.back();
           }
         }
       } catch (error) {
-        Alert.alert('Ошибка', 'Не удалось загрузить заметку');
+        Alert.alert("Ошибка", "Не удалось загрузить заметку");
       }
     };
 
@@ -43,39 +47,65 @@ export default function EditNoteScreen() {
   const saveEditedNote = async () => {
     if (!note) return;
     try {
-      const storedNotes = await AsyncStorage.getItem('notes');
+      const storedNotes = await AsyncStorage.getItem("notes");
       if (storedNotes) {
         const notesArray: Note[] = JSON.parse(storedNotes);
         const updatedNotes = notesArray.map((n) =>
-          n.id === note.id ? { ...n, content: noteContent } : n
+          n.id === note.id
+            ? { ...n, content: noteContent, category: category.trim() }
+            : n
         );
-        await AsyncStorage.setItem('notes', JSON.stringify(updatedNotes));
-        Alert.alert('Успех', 'Заметка обновлена');
+        await AsyncStorage.setItem("notes", JSON.stringify(updatedNotes));
+        Alert.alert("Успех", "Заметка обновлена");
         router.back();
       }
     } catch (error) {
-      Alert.alert('Ошибка', 'Не удалось сохранить изменения');
+      Alert.alert("Ошибка", "Не удалось сохранить изменения");
     }
   };
 
   return (
-    <View style={{ flex: 1, padding: 20 }}>
-      <Text style={{ fontSize: 24, marginBottom: 10 }}>Редактирование заметки</Text>
+    <View
+      style={{ flex: 1, padding: 20, backgroundColor: theme.colors.background }}
+    >
+      <Text variant="headlineMedium" style={{ marginBottom: 10 }}>
+        Редактирование заметки
+      </Text>
       <TextInput
+        mode="outlined"
+        label="Содержимое заметки"
         value={noteContent}
         onChangeText={setNoteContent}
         multiline
         style={{
-          borderWidth: 1,
-          borderColor: '#ccc',
-          borderRadius: 5,
-          padding: 10,
-          marginBottom: 20,
+          marginBottom: 10,
           height: 100,
+          backgroundColor: theme.colors.surface,
         }}
+        outlineColor={theme.colors.primary}
+        textColor={theme.colors.onSurface}
+        placeholderTextColor={theme.colors.onSurfaceVariant}
       />
-      <Button title="Сохранить изменения" onPress={saveEditedNote} />
-      <Button title="Отмена" onPress={() => router.back()} color="gray" />
+      <TextInput
+        mode="outlined"
+        label="Категория (необязательно)"
+        value={category}
+        onChangeText={setCategory}
+        style={{ marginBottom: 20, backgroundColor: theme.colors.surface }}
+        outlineColor={theme.colors.primary}
+        textColor={theme.colors.onSurface}
+        placeholderTextColor={theme.colors.onSurfaceVariant}
+      />
+      <Button
+        mode="contained"
+        onPress={saveEditedNote}
+        style={{ marginBottom: 10 }}
+      >
+        Сохранить изменения
+      </Button>
+      <Button mode="outlined" onPress={() => router.back()}>
+        Отмена
+      </Button>
     </View>
   );
 }

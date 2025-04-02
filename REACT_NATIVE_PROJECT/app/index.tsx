@@ -1,23 +1,28 @@
-import { useState, useCallback } from 'react';
-import { View, Text, Button, FlatList, Alert, TextInput, Image } from 'react-native';
-import { useRouter } from 'expo-router';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useFocusEffect } from '@react-navigation/native';
+import React, { useState, useCallback } from "react";
+import { View, Alert, FlatList, Image } from "react-native";
+import { Text, Button, TextInput, Card, useTheme } from "react-native-paper";
+import { useRouter } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "@react-navigation/native";
 
 interface Note {
   id: number;
   content: string;
   image?: string;
+  category?: string;
 }
 
 export default function HomeScreen() {
+  const theme = useTheme();
   const router = useRouter();
   const [notes, setNotes] = useState<Note[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState(""); // для фильтрации по категории
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc"); // сортировка по дате
 
   const loadNotes = async () => {
     try {
-      const storedNotes = await AsyncStorage.getItem('notes');
+      const storedNotes = await AsyncStorage.getItem("notes");
       if (storedNotes) {
         const parsedNotes = JSON.parse(storedNotes);
         if (Array.isArray(parsedNotes)) {
@@ -32,7 +37,7 @@ export default function HomeScreen() {
         setNotes([]);
       }
     } catch (error) {
-      Alert.alert('Ошибка', 'Не удалось загрузить заметки');
+      Alert.alert("Ошибка", "Не удалось загрузить заметки");
     }
   };
 
@@ -45,73 +50,121 @@ export default function HomeScreen() {
   const deleteNote = async (id: number) => {
     try {
       const filteredNotes = notes.filter((note) => note.id !== id);
-      await AsyncStorage.setItem('notes', JSON.stringify(filteredNotes));
+      await AsyncStorage.setItem("notes", JSON.stringify(filteredNotes));
       setNotes(filteredNotes);
     } catch (error) {
-      Alert.alert('Ошибка', 'Не удалось удалить заметку');
+      Alert.alert("Ошибка", "Не удалось удалить заметку");
     }
   };
 
-  const filteredNotes = notes.filter((note) =>
-    note.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredNotes = notes.filter((note) => {
+    const matchesContent = note.content
+      .toLowerCase()
+      .includes(searchQuery.toLowerCase());
+    const matchesCategory = categoryFilter
+      ? note.category?.toLowerCase().includes(categoryFilter.toLowerCase())
+      : true;
+    return matchesContent && matchesCategory;
+  });
+
+  const sortedNotes = filteredNotes.sort((a, b) => {
+    if (sortOrder === "asc") {
+      return a.id - b.id;
+    } else {
+      return b.id - a.id;
+    }
+  });
 
   return (
-    <View style={{ flex: 1, padding: 20 }}>
-      <Text style={{ fontSize: 24, textAlign: 'center', marginBottom: 10 }}>
+    <View
+      style={{ flex: 1, padding: 20, backgroundColor: theme.colors.background }}
+    >
+      <Text
+        variant="headlineMedium"
+        style={{ textAlign: "center", marginBottom: 10 }}
+      >
         Мои заметки
       </Text>
       <TextInput
-        placeholder="Поиск заметок..."
+        mode="outlined"
+        label="Поиск заметок..."
         value={searchQuery}
         onChangeText={setSearchQuery}
-        style={{
-          borderWidth: 1,
-          borderColor: '#ccc',
-          borderRadius: 5,
-          padding: 10,
-          marginBottom: 10,
-        }}
+        style={{ marginBottom: 10, backgroundColor: theme.colors.surface }}
+        outlineColor={theme.colors.primary}
+        textColor={theme.colors.onSurface}
+        placeholderTextColor={theme.colors.onSurfaceVariant}
       />
-      {filteredNotes.length === 0 ? (
-        <Text style={{ textAlign: 'center', fontSize: 16, marginBottom: 20 }}>
+      <TextInput
+        mode="outlined"
+        label="Фильтр по категории..."
+        value={categoryFilter}
+        onChangeText={setCategoryFilter}
+        style={{ marginBottom: 10, backgroundColor: theme.colors.surface }}
+        outlineColor={theme.colors.primary}
+        textColor={theme.colors.onSurface}
+        placeholderTextColor={theme.colors.onSurfaceVariant}
+      />
+      <Button
+        mode="outlined"
+        onPress={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
+        style={{ marginBottom: 10 }}
+      >
+        Сортировка: {sortOrder === "asc" ? "Сначала старые" : "Сначала новые"}
+      </Button>
+      {sortedNotes.length === 0 ? (
+        <Text style={{ textAlign: "center", fontSize: 16, marginBottom: 20 }}>
           Нет заметок
         </Text>
       ) : (
         <FlatList
-          data={filteredNotes}
+          data={sortedNotes}
           keyExtractor={(item, index) =>
             item && item.id ? item.id.toString() : index.toString()
           }
           renderItem={({ item }) => (
-            <View
+            <Card
               style={{
-                padding: 10,
-                borderBottomWidth: 1,
-                borderColor: '#ddd',
                 marginBottom: 10,
+                backgroundColor: theme.colors.surface,
               }}
             >
-              <Text style={{ marginBottom: 5 }}>{item.content}</Text>
-              {item.image && (
-                <Image
-                  source={{ uri: item.image }}
-                  style={{ width: 100, height: 100, marginBottom: 5 }}
-                />
-              )}
-              <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+              <Card.Content>
+                <Text style={{ marginBottom: 5 }}>{item.content}</Text>
+                {item.category ? (
+                  <Text
+                    style={{
+                      fontStyle: "italic",
+                      color: theme.colors.onSurfaceVariant,
+                    }}
+                  >
+                    Категория: {item.category}
+                  </Text>
+                ) : null}
+                {item.image && (
+                  <Image
+                    source={{ uri: item.image }}
+                    style={{ width: 100, height: 100, marginTop: 5 }}
+                  />
+                )}
+              </Card.Content>
+              <Card.Actions style={{ justifyContent: "flex-end" }}>
                 <Button
-                  title="Редактировать"
                   onPress={() => router.push(`/edit-note?noteId=${item.id}`)}
-                />
-                <View style={{ width: 10 }} />
-                <Button title="Удалить" onPress={() => deleteNote(item.id)} color="red" />
-              </View>
-            </View>
+                >
+                  Редактировать
+                </Button>
+                <Button onPress={() => deleteNote(item.id)} textColor="#000000">
+                  Удалить
+                </Button>
+              </Card.Actions>
+            </Card>
           )}
         />
       )}
-      <Button title="Добавить заметку" onPress={() => router.push('/add-note')} />
+      <Button mode="contained" onPress={() => router.push("/add-note")}>
+        Добавить заметку
+      </Button>
     </View>
   );
 }
